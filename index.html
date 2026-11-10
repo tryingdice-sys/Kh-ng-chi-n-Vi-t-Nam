@@ -1,0 +1,1271 @@
+```html
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kháng Chiến Việt Nam - Metal Slug 2D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #030712;
+            color: #ffffff;
+            touch-action: manipulation;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .crt-scanlines::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+            z-index: 40;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        .text-glow-gold {
+            text-shadow: 0 0 10px rgba(250, 204, 21, 0.8), 0 0 20px rgba(234, 88, 12, 0.6);
+        }
+
+        .text-glow-red {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(185, 28, 28, 0.8);
+        }
+
+        /* Mobile Touch Controls */
+        .btn-touch {
+            background: rgba(15, 23, 42, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(4px);
+            touch-action: none;
+        }
+        .btn-touch:active {
+            background: rgba(234, 179, 8, 0.5);
+            border-color: #facc15;
+        }
+        .slot-active {
+            border-color: #facc15 !important;
+            background: rgba(234, 179, 8, 0.4) !important;
+            box-shadow: 0 0 10px #facc15;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+    </style>
+</head>
+<body class="w-full h-screen flex flex-col items-center justify-center bg-gray-950">
+
+    <!-- Container wrapper -->
+    <div class="relative w-full max-w-6xl h-full max-h-[720px] flex flex-col justify-center items-center crt-scanlines p-0 sm:p-2">
+        
+        <!-- Main Game View -->
+        <div id="game-container" class="relative w-full h-full flex justify-center items-center bg-black border-2 sm:border-4 border-yellow-800 rounded-none sm:rounded-lg shadow-2xl overflow-hidden">
+            <canvas id="gameCanvas" class="w-full h-full object-contain" width="960" height="540"></canvas>
+
+            <!-- 1. MAIN MENU OVERLAY -->
+            <div id="mainMenu" class="absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center text-center p-4 z-50">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-red-600 text-3xl sm:text-5xl">★</span>
+                    <h1 class="text-xl sm:text-4xl text-yellow-400 font-bold tracking-widest text-glow-gold leading-tight">
+                        CHIẾN DỊCH KHÁNG CHIẾN<br><span class="text-red-500">VIỆT NAM</span>
+                    </h1>
+                    <span class="text-red-600 text-3xl sm:text-5xl">★</span>
+                </div>
+                <p class="text-[10px] sm:text-xs text-green-400 mb-6 animate-pulse tracking-wider">--- ARCADE METAL SLUG 2D RETRO ---</p>
+
+                <!-- Keybindings guide box -->
+                <div class="text-[9px] sm:text-xs text-gray-200 mb-6 space-y-2 text-left max-w-2xl bg-green-950/80 p-4 rounded-lg border border-green-700/60 shadow-lg">
+                    <p class="text-yellow-400 font-bold border-b border-green-700 pb-1 mb-2 text-center">BẢNG PHÍM ĐIỀU KHIỂN & VỦ KHÍ:</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                        <p><span class="text-yellow-300 font-bold">A / D</span> : Di chuyển (Trái / Phải)</p>
+                        <p><span class="text-yellow-300 font-bold">W / S</span> : Ngước súng lên / Ngồi né đạn</p>
+                        <p><span class="text-yellow-300 font-bold">J</span> : Tấn công (Bắn súng / Chém dao)</p>
+                        <p><span class="text-yellow-300 font-bold">K</span> : Nhảy cao</p>
+                        <p><span class="text-yellow-300 font-bold">L</span> : Ném lựu đạn F1 (AOE)</p>
+                        <p><span class="text-yellow-300 font-bold">1</span> : Dao Găm (Cận chiến 1-hit kill)</p>
+                        <p><span class="text-yellow-300 font-bold">2</span> : Súng nhỏ K-54 (Đạn vô hạn)</p>
+                        <p><span class="text-yellow-300 font-bold">3</span> : Súng to (AK-47, B-40, Phun lửa...)</p>
+                        <p><span class="text-cyan-400 font-bold">F</span> : Nhặt đồ & Cứu Du kích</p>
+                        <p><span class="text-red-400 font-bold">G</span> : Vứt súng to đang cầm ra đất</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <button id="btnLevelSelect" class="px-5 py-3.5 bg-yellow-700 hover:bg-yellow-600 text-yellow-100 font-bold text-xs sm:text-sm rounded border-2 border-yellow-400 transition cursor-pointer active:scale-95 shadow-lg">
+                        CHỌN CHIẾN DỊCH (6 MÀN)
+                    </button>
+                    <button id="btnStart" class="px-8 py-3.5 bg-red-700 hover:bg-red-600 text-yellow-300 font-bold text-xs sm:text-sm rounded border-2 border-yellow-400 transition cursor-pointer active:scale-95 shadow-lg">
+                        BẮT ĐẦU NGAY ►
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. LEVEL SELECT OVERLAY -->
+            <div id="levelSelectMenu" class="absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center p-4 z-50 hidden">
+                <h2 class="text-lg sm:text-2xl text-yellow-400 font-bold mb-4 text-glow-gold">CHỌN CHIẾN DỊCH LỊCH SỬ</h2>
+                <div id="levelList" class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-3xl max-h-[65vh] overflow-y-auto p-2">
+                    <!-- Dynamic Levels insertion -->
+                </div>
+                <button id="btnBackMenu" class="mt-4 px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-xs rounded border border-gray-500 cursor-pointer">
+                    ◄ QUAY LẠI MAIN MENU
+                </button>
+            </div>
+
+            <!-- 3. GAME OVER / VICTORY OVERLAY -->
+            <div id="gameOverMenu" class="absolute inset-0 bg-black/95 flex flex-col justify-center items-center text-center p-6 z-50 hidden">
+                <h2 id="gameOverTitle" class="text-2xl sm:text-4xl text-red-600 font-bold mb-2 text-glow-red">HY SINH</h2>
+                <p id="gameOverSub" class="text-xs sm:text-sm text-green-400 mb-2">MÀN 1: CHIẾN KHU VIỆT BẮC</p>
+                <p id="finalScore" class="text-sm sm:text-base text-yellow-400 mb-6 font-bold">ĐIỂM CHIẾN CÔNG: 0</p>
+                
+                <div class="flex flex-wrap justify-center gap-3">
+                    <button id="btnMenuFromEnd" class="px-5 py-3 bg-gray-800 hover:bg-gray-700 text-white text-xs rounded border border-gray-500 cursor-pointer">
+                        VỀ MENU CHÍNH
+                    </button>
+                    <button id="btnRestart" class="px-6 py-3 bg-green-700 hover:bg-green-600 text-yellow-300 font-bold text-xs rounded border-2 border-yellow-400 cursor-pointer">
+                        CHƠI LẠI MÀN NÀY
+                    </button>
+                    <button id="btnNextLevel" class="px-6 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold text-xs rounded border-2 border-yellow-300 cursor-pointer hidden">
+                        CHIẾN DỊCH TIẾP THEO ►
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Touch Controls for Mobile Devices -->
+        <div id="mobileControls" class="w-full flex justify-between items-end px-2 py-1.5 bg-slate-900 border-t-2 border-yellow-800 sm:hidden z-50">
+            <!-- D-Pad -->
+            <div class="grid grid-cols-3 gap-1 w-28 h-28">
+                <div></div>
+                <button id="tBtnW" class="btn-touch rounded flex items-center justify-center text-lg text-white font-bold">▲</button>
+                <div></div>
+                <button id="tBtnA" class="btn-touch rounded flex items-center justify-center text-lg text-white font-bold">◄</button>
+                <button id="tBtnS" class="btn-touch rounded flex items-center justify-center text-lg text-white font-bold">▼</button>
+                <button id="tBtnD" class="btn-touch rounded flex items-center justify-center text-lg text-white font-bold">►</button>
+            </div>
+
+            <!-- Interact & Weapon Switch -->
+            <div class="flex flex-col gap-1 mx-1">
+                <div class="flex gap-1 justify-center">
+                    <button id="tBtnF" class="btn-touch px-2 py-1.5 rounded text-[9px] font-bold text-cyan-300 border-cyan-400">NHẶT(F)</button>
+                    <button id="tBtnG" class="btn-touch px-2 py-1.5 rounded text-[9px] font-bold text-red-400 border-red-400">VỨT(G)</button>
+                </div>
+                <div class="flex gap-1">
+                    <button id="tBtn1" class="btn-touch btn-slot text-[8px] px-1.5 py-2 rounded text-yellow-300">1:DAO</button>
+                    <button id="tBtn2" class="btn-touch btn-slot text-[8px] px-1.5 py-2 rounded text-yellow-300">2:K54</button>
+                    <button id="tBtn3" class="btn-touch btn-slot text-[8px] px-1.5 py-2 rounded text-yellow-300">3:S.TO</button>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex flex-col gap-1 items-end">
+                <button id="tBtnL" class="btn-touch w-10 h-10 rounded-full flex items-center justify-center text-[9px] font-bold text-orange-400 border-orange-400 mr-6">BOM</button>
+                <div class="flex gap-1.5">
+                    <button id="tBtnJ" class="btn-touch w-12 h-12 rounded-full flex items-center justify-center text-[10px] font-bold text-yellow-400 border-yellow-400">BẮN</button>
+                    <button id="tBtnK" class="btn-touch w-12 h-12 rounded-full flex items-center justify-center text-[10px] font-bold text-green-400 border-green-400">NHẢY</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. GAME_ASSETS_CONFIG - CẤU HÌNH MODDING ASSETS (TỰ THAY ĐỔI ẢNH)
+         * ============================================================================
+         * Bạn có thể thay đổi các đường dẫn ảnh (URL hoặc chuỗi Base64) bên dưới.
+         * Nếu để rỗng "", game sẽ tự động gọi bộ vẽ Procedural Pixel Art cực đẹp!
+         */
+        const GAME_ASSETS_CONFIG = {
+            player: { url: "", width: 44, height: 60 },
+            enemyFrench: { url: "", width: 44, height: 60 },
+            enemyUS: { url: "", width: 44, height: 60 },
+            guerrilla: { url: "", width: 36, height: 50 },
+            bossTank: { url: "", width: 220, height: 130 },
+            bossHeli: { url: "", width: 240, height: 120 },
+            bossB52: { url: "", width: 280, height: 140 },
+            bossGate: { url: "", width: 260, height: 160 },
+            bgVietBac: { url: "" },
+            bgDienBien: { url: "" },
+            bgTruongSon: { url: "" },
+            bgMauThan: { url: "" },
+            bgHaNoi: { url: "" },
+            bgSaiGon: { url: "" }
+        };
+
+        const images = {};
+        function loadCustomAssets() {
+            for (let key in GAME_ASSETS_CONFIG) {
+                if (GAME_ASSETS_CONFIG[key].url !== "") {
+                    let img = new Image();
+                    img.src = GAME_ASSETS_CONFIG[key].url;
+                    images[key] = img;
+                }
+            }
+        }
+        loadCustomAssets();
+
+        /**
+         * ============================================================================
+         * 2. AUDIO SYNTHESIZER (WEB AUDIO API RETRO SOUNDS)
+         * ============================================================================
+         */
+        class SoundSystem {
+            constructor() { this.ctx = null; }
+            init() {
+                if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            playTone(freq, type, duration, vol=0.1) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + duration);
+                } catch(e){}
+            }
+            playNoise(duration, vol=0.2) {
+                if (!this.ctx) return;
+                try {
+                    const bufferSize = this.ctx.sampleRate * duration;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass'; filter.frequency.value = 800;
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                    noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+                    noise.start();
+                } catch(e){}
+            }
+            shootPistol() { this.playTone(550, 'square', 0.08, 0.1); }
+            shootAK() { this.playTone(320, 'sawtooth', 0.09, 0.15); }
+            shootB40() { this.playTone(140, 'square', 0.28, 0.25); }
+            shootFlame() { this.playNoise(0.12, 0.15); }
+            slash() { this.playTone(850, 'sine', 0.12, 0.15); }
+            explosion() { this.playNoise(0.45, 0.35); }
+            pickup() {
+                if(!this.ctx) return;
+                this.playTone(523.25, 'triangle', 0.08, 0.15);
+                setTimeout(()=>this.playTone(659.25, 'triangle', 0.12, 0.15), 60);
+            }
+            victory() {
+                if(!this.ctx) return;
+                const notes = [523, 659, 783, 1046];
+                notes.forEach((n, i) => setTimeout(() => this.playTone(n, 'square', 0.2, 0.2), i * 150));
+            }
+        }
+        const sfx = new SoundSystem();
+
+        /**
+         * ============================================================================
+         * 3. GAME DATA & WEAPONS DEFINITIONS
+         * ============================================================================
+         */
+        const WEAPONS = {
+            AK47: { name: 'AK-47', type: 'RAPID', ammoMax: 150, damage: 28, speed: 16, cooldown: 6, color: '#facc15' },
+            B40: { name: 'B-40 RPG', type: 'EXPLOSIVE', ammoMax: 15, damage: 160, speed: 11, cooldown: 35, color: '#ef4444' },
+            FLAME: { name: 'PHUN LỬA M2', type: 'FLAME', ammoMax: 150, damage: 14, speed: 8, cooldown: 4, color: '#f97316' },
+            M60: { name: 'SÚNG M60', type: 'HEAVY', ammoMax: 200, damage: 32, speed: 18, cooldown: 5, color: '#eab308' },
+            CKC: { name: 'CKC SNIPER', type: 'SNIPER', ammoMax: 20, damage: 180, speed: 22, cooldown: 30, color: '#38bdf8' }
+        };
+
+        const LEVELS = [
+            { id: 1, name: 'MÀN 1: CHIẾN KHU VIỆT BẮC (1947)', desc: 'Rừng tre, chòi lá đụng độ quân Pháp', theme: 'bgVietBac', length: 3200, groundY: 440, boss: 'FRENCH_FORT', bossName: 'CỨ ĐIỂM ĐỒN PHÁP' },
+            { id: 2, name: 'MÀN 2: ĐIỆN BIÊN PHỦ (1954)', desc: 'Chiến hào đồi A1 & Xe tăng Chaffee M24', theme: 'bgDienBien', length: 3600, groundY: 440, boss: 'CHAFFEE_TANK', bossName: 'XE TĂNG CHAFFEE M24' },
+            { id: 3, name: 'MÀN 3: ĐƯỜNG TRƯỜNG SƠN (1965)', desc: 'Rừng rậm, bẫy chông tre & Trực thăng', theme: 'bgTruongSon', length: 4000, groundY: 440, boss: 'HELI_GUNSHIP', bossName: 'TRỰC THĂNG HU-1A' },
+            { id: 4, name: 'MÀN 4: MẬU THÂN HUẾ (1968)', desc: 'Tác chiến đô thị Huế & Thiết giáp M113', theme: 'bgMauThan', length: 3800, groundY: 440, boss: 'M113_APC', bossName: 'XE THIẾT GIÁP M113' },
+            { id: 5, name: 'MÀN 5: HÀ NỘI 12 NGÀY ĐÊM (1972)', desc: 'Đêm Hà Nội còi báo động & Pháo cao xạ', theme: 'bgHaNoi', length: 4200, groundY: 440, boss: 'B52_BOMBER', bossName: 'XÁC MÁY BAY B-52 RƠI' },
+            { id: 6, name: 'MÀN 6: CHIẾN DỊCH HỒ CHÍ MINH (1975)', desc: 'Đại lộ Sài Gòn, húc cổng Dinh Độc Lập!', theme: 'bgSaiGon', length: 4500, groundY: 440, boss: 'DINH_DOC_LAP', bossName: 'CỔNG DINH ĐỘC LẬP' }
+        ];
+
+        /**
+         * ============================================================================
+         * 4. GAME ENGINE CORE & VARIABLES
+         * ============================================================================
+         */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'MENU'; // MENU, LEVEL_SELECT, PLAYING, GAMEOVER, VICTORY
+        let currentLevel = 0;
+        let score = 0;
+        let cameraX = 0;
+        let gravity = 0.65;
+        let frameCount = 0;
+        let screenShake = 0;
+
+        const keys = { a: false, d: false, w: false, s: false, j: false, k: false, l: false, f: false, g: false, 1: false, 2: false, 3: false };
+        let prevKeys = { ...keys };
+
+        let player;
+        let bullets = [];
+        let grenades = [];
+        let enemies = [];
+        let items = [];
+        let hostages = [];
+        let particles = [];
+        let boss = null;
+        let platforms = [];
+        let traps = [];
+
+        function rectIntersect(r1, r2) {
+            return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
+        }
+
+        /**
+         * ============================================================================
+         * 5. GAME ENTITIES (PLAYER, BULLETS, ENEMIES, BOSSES)
+         * ============================================================================
+         */
+        class Player {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.w = 40; this.h = 58;
+                this.vx = 0; this.vy = 0;
+                this.speed = 4.8;
+                this.jumpPower = -12.5;
+                this.grounded = false;
+                this.crouching = false;
+                this.facing = 1; // 1 = Right, -1 = Left
+                this.aimY = 0;   // -1 = Up, 0 = Forward
+                
+                this.hp = 100; this.maxHp = 100;
+                this.lives = 3;
+                this.bombs = 10;
+                
+                this.slot = 2; // 1: Knife, 2: Pistol K-54, 3: Heavy Weapon
+                this.heavyWeapon = null;
+                this.heavyAmmo = 0;
+                
+                this.cooldown = 0;
+                this.bombCooldown = 0;
+                this.invul = 0;
+                this.slashTimer = 0;
+            }
+
+            update() {
+                if (this.cooldown > 0) this.cooldown--;
+                if (this.bombCooldown > 0) this.bombCooldown--;
+                if (this.invul > 0) this.invul--;
+                if (this.slashTimer > 0) this.slashTimer--;
+
+                // Weapon Slot Selection
+                if (keys['1']) this.slot = 1;
+                if (keys['2']) this.slot = 2;
+                if (keys['3'] && this.heavyWeapon && this.heavyAmmo > 0) this.slot = 3;
+
+                // Drop Heavy Weapon (Key G)
+                if (keys.g && !prevKeys.g && this.heavyWeapon && this.heavyAmmo > 0) {
+                    items.push(new Item(this.x + this.facing * 30, this.y + 20, 'WEAPON', this.heavyWeapon, this.heavyAmmo));
+                    this.heavyWeapon = null;
+                    this.heavyAmmo = 0;
+                    this.slot = 2;
+                    sfx.pickup();
+                }
+
+                // Interact / Pick Up / Rescue (Key F)
+                if (keys.f && !prevKeys.f) {
+                    // Pick items
+                    items.forEach(item => {
+                        if (rectIntersect(this, item)) {
+                            if (item.type === 'WEAPON') {
+                                if (this.heavyWeapon) {
+                                    items.push(new Item(this.x - this.facing*20, this.y + 20, 'WEAPON', this.heavyWeapon, this.heavyAmmo));
+                                }
+                                this.heavyWeapon = item.weaponData;
+                                this.heavyAmmo = item.ammo;
+                                this.slot = 3;
+                            } else if (item.type === 'HP') {
+                                this.hp = Math.min(this.maxHp, this.hp + 40);
+                            } else if (item.type === 'BOMB') {
+                                this.bombs += 5;
+                            }
+                            item.dead = true;
+                            sfx.pickup();
+                        }
+                    });
+
+                    // Rescue Guerrillas / Captives
+                    hostages.forEach(h => {
+                        if (!h.rescued && rectIntersect(this, h)) {
+                            h.rescued = true;
+                            score += 500;
+                            sfx.pickup();
+                            // Drop Heavy Weapon Reward
+                            const wKeys = Object.keys(WEAPONS);
+                            const randomWep = WEAPONS[wKeys[Math.floor(Math.random()*wKeys.length)]];
+                            items.push(new Item(h.x + 20, h.y + 10, 'WEAPON', randomWep, randomWep.ammoMax));
+                        }
+                    });
+                }
+
+                // Movement & Aiming
+                this.vx = 0;
+                this.crouching = keys.s && this.grounded;
+                this.aimY = keys.w ? -1 : 0;
+
+                if (!this.crouching) {
+                    if (keys.a) { this.vx = -this.speed; this.facing = -1; }
+                    if (keys.d) { this.vx = this.speed; this.facing = 1; }
+                }
+
+                // Jump
+                if (keys.k && !prevKeys.k && this.grounded) {
+                    this.vy = this.jumpPower;
+                    this.grounded = false;
+                }
+
+                // Physics
+                this.vy += gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Level Boundary Constraints
+                let lvl = LEVELS[currentLevel];
+                if (this.x < cameraX) this.x = cameraX;
+                if (this.x > lvl.length - this.w) this.x = lvl.length - this.w;
+
+                // Ground Floor Collision
+                this.grounded = false;
+                if (this.y + this.h >= lvl.groundY) {
+                    this.y = lvl.groundY - this.h;
+                    this.vy = 0;
+                    this.grounded = true;
+                }
+
+                // Platform Collision
+                platforms.forEach(p => {
+                    if (this.vy >= 0 && this.x + this.w > p.x && this.x < p.x + p.w && 
+                        this.y + this.h >= p.y && this.y + this.h - this.vy <= p.y + 12) {
+                        if (!keys.s) {
+                            this.y = p.y - this.h;
+                            this.vy = 0;
+                            this.grounded = true;
+                        }
+                    }
+                });
+
+                // Spike Traps Collision
+                traps.forEach(t => {
+                    if (rectIntersect(this, t)) {
+                        this.takeDamage(25);
+                        this.vy = -6; // bounce back
+                    }
+                });
+
+                // Attack (Key J)
+                if (keys.j && this.cooldown <= 0) {
+                    this.attack();
+                }
+
+                // Grenade F1 (Key L)
+                if (keys.l && !prevKeys.l && this.bombCooldown <= 0 && this.bombs > 0) {
+                    this.bombs--;
+                    this.bombCooldown = 28;
+                    grenades.push(new Grenade(this.x + this.w/2, this.y + 10, this.facing * 7.5 + this.vx, -7.5, 'PLAYER'));
+                }
+            }
+
+            attack() {
+                let spawnX = this.facing === 1 ? this.x + this.w : this.x;
+                let spawnY = this.crouching ? this.y + 26 : (this.aimY === -1 ? this.y - 10 : this.y + 16);
+                let dirX = this.aimY === -1 ? 0 : this.facing;
+                let dirY = this.aimY === -1 ? -1 : 0;
+
+                if (this.slot === 1) { // DAO GĂM (MELEE KNIFE)
+                    this.cooldown = 14;
+                    this.slashTimer = 10;
+                    sfx.slash();
+                    let hitBox = { x: this.facing===1 ? this.x+this.w : this.x-48, y: this.y, w: 48, h: this.h };
+                    
+                    // 1-HIT KILL NORMAL INFANTRY
+                    enemies.forEach(e => {
+                        if (rectIntersect(hitBox, e)) {
+                            e.takeDamage(999);
+                            spawnParticles(e.x+e.w/2, e.y+e.h/2, '#ef4444', 12);
+                        }
+                    });
+                    if (boss && boss.active && rectIntersect(hitBox, boss)) {
+                        boss.takeDamage(75);
+                        spawnParticles(boss.x+boss.w/2, boss.y+boss.h/2, '#facc15', 10);
+                    }
+                } 
+                else if (this.slot === 2) { // SÚNG NHỎ K-54 PISTOL
+                    this.cooldown = 12;
+                    bullets.push(new Bullet(spawnX, spawnY, dirX, dirY, 15, 22, '#ffffff', 'PLAYER'));
+                    sfx.shootPistol();
+                    spawnParticles(spawnX, spawnY, '#facc15', 3);
+                } 
+                else if (this.slot === 3 && this.heavyWeapon) { // HEAVY WEAPONS
+                    this.cooldown = this.heavyWeapon.cooldown;
+                    this.heavyAmmo--;
+                    
+                    let wep = this.heavyWeapon;
+                    if (wep.type === 'RAPID' || wep.type === 'HEAVY') {
+                        bullets.push(new Bullet(spawnX, spawnY, dirX, dirY + (Math.random()-0.5)*0.08, wep.speed, wep.damage, wep.color, 'PLAYER'));
+                        sfx.shootAK();
+                    } else if (wep.type === 'EXPLOSIVE') {
+                        bullets.push(new Bullet(spawnX, spawnY, dirX, dirY, wep.speed, wep.damage, wep.color, 'PLAYER', true));
+                        sfx.shootB40();
+                    } else if (wep.type === 'FLAME') {
+                        for(let i=0; i<3; i++) {
+                            bullets.push(new Bullet(spawnX, spawnY, dirX + (Math.random()-0.5)*0.3, dirY + (Math.random()-0.5)*0.3, wep.speed, wep.damage, '#f97316', 'PLAYER', false, true));
+                        }
+                        sfx.shootFlame();
+                    } else if (wep.type === 'SNIPER') {
+                        bullets.push(new Bullet(spawnX, spawnY, dirX, dirY, wep.speed, wep.damage, '#38bdf8', 'PLAYER'));
+                        sfx.shootPistol();
+                    }
+                    spawnParticles(spawnX, spawnY, '#facc15', 4);
+
+                    if (this.heavyAmmo <= 0) {
+                        this.heavyWeapon = null;
+                        this.slot = 2;
+                    }
+                }
+            }
+
+            takeDamage(amt) {
+                if (this.invul > 0) return;
+                this.hp -= amt;
+                this.invul = 55;
+                screenShake = 12;
+                sfx.explosion();
+                spawnParticles(this.x + this.w/2, this.y + this.h/2, '#ef4444', 15);
+                
+                if (this.hp <= 0) {
+                    this.lives--;
+                    if (this.lives >= 0) {
+                        this.hp = this.maxHp;
+                        this.heavyWeapon = null;
+                        this.slot = 2;
+                    } else {
+                        endGame(false);
+                    }
+                }
+            }
+
+            draw() {
+                if (this.invul > 0 && frameCount % 8 < 4) return;
+                
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y);
+
+                if (images.player) {
+                    ctx.drawImage(images.player, 0, 0, this.w, this.h);
+                } else {
+                    // PROCEDURAL BỘ ĐỘI CỤ HỒ SPRITE
+                    // Uniform Green
+                    ctx.fillStyle = '#15803d';
+                    if (this.crouching) {
+                        ctx.fillRect(4, 22, 32, 36);
+                    } else {
+                        ctx.fillRect(6, 16, 28, 26);
+                        // Legs & Dép Cao Su
+                        ctx.fillStyle = '#14532d';
+                        let legAnim = (this.vx !== 0) ? Math.sin(frameCount * 0.35) * 6 : 0;
+                        ctx.fillRect(8, 42 - legAnim, 8, 14);
+                        ctx.fillRect(24, 42 + legAnim, 8, 14);
+                        // Black rubber sandals (Dép cao su)
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(6, 54 - legAnim, 12, 4);
+                        ctx.fillRect(22, 54 + legAnim, 12, 4);
+                    }
+
+                    // Face / Skin
+                    let headY = this.crouching ? 16 : 0;
+                    ctx.fillStyle = '#fca5a5';
+                    ctx.fillRect(10, headY + 4, 20, 14);
+                    
+                    // Pith Helmet (Mũ Cối) & Red Star Emblem
+                    ctx.fillStyle = '#166534';
+                    ctx.beginPath();
+                    ctx.arc(20, headY + 5, 14, Math.PI, 0);
+                    ctx.fill();
+                    ctx.fillRect(4, headY + 5, 32, 3.5); // Rim
+                    // Red Star (Ngôi sao đỏ)
+                    ctx.fillStyle = '#ef4444'; ctx.fillRect(18.5, headY + 1, 3, 3);
+                    ctx.fillStyle = '#facc15'; ctx.fillRect(19.5, headY + 2, 1, 1);
+
+                    // Arms & Weapons
+                    let armY = this.crouching ? 32 : 20;
+                    if (this.aimY === -1) {
+                        ctx.fillStyle = '#15803d'; ctx.fillRect(14, armY - 14, 12, 14);
+                        drawWeapon(this.slot, this.heavyWeapon, 14, armY - 24, 0, -1);
+                    } else {
+                        ctx.fillStyle = '#15803d'; ctx.fillRect(this.facing===1 ? 22 : 2, armY, 16, 8);
+                        drawWeapon(this.slot, this.heavyWeapon, this.facing===1 ? 32 : -12, armY, this.facing, 0);
+                    }
+                }
+
+                // Melee Knife Slash Arc Animation
+                if (this.slashTimer > 0) {
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(this.facing===1 ? 24 : 16, this.crouching ? 30 : 20, 32, -Math.PI/2, Math.PI/2, this.facing===-1);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        function drawWeapon(slot, heavyWep, x, y, dirX, dirY) {
+            ctx.save();
+            ctx.translate(x, y);
+            if (dirY === -1) ctx.rotate(-Math.PI/2);
+            else if (dirX === -1) ctx.scale(-1, 1);
+
+            if (slot === 1) { // Dao Găm
+                ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, 0, 18, 4);
+                ctx.fillStyle = '#78350f'; ctx.fillRect(-6, 0, 6, 4);
+            } else if (slot === 2) { // K-54 Pistol
+                ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, 14, 6);
+                ctx.fillRect(0, 6, 5, 6);
+            } else if (slot === 3 && heavyWep) {
+                if (heavyWep.name.includes('AK-47')) {
+                    ctx.fillStyle = '#78350f'; ctx.fillRect(-10, 2, 10, 5); // Stock
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, 24, 5);  // Barrel
+                    ctx.fillStyle = '#d97706'; ctx.fillRect(8, 5, 6, 9);   // Curved Mag
+                } else if (heavyWep.name.includes('B-40')) {
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(-6, 0, 32, 7);
+                    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(26, -1); ctx.lineTo(34, -4); ctx.lineTo(34, 11); ctx.lineTo(26, 8); ctx.fill();
+                } else if (heavyWep.name.includes('PHUN LỬA')) {
+                    ctx.fillStyle = '#c2410c'; ctx.fillRect(-4, -2, 28, 10);
+                    ctx.fillStyle = '#f97316'; ctx.fillRect(24, 0, 6, 6);
+                } else {
+                    ctx.fillStyle = '#0f172a'; ctx.fillRect(-8, 0, 30, 6);
+                }
+            }
+            ctx.restore();
+        }
+
+        class Bullet {
+            constructor(x, y, dx, dy, speed, dmg, color, owner, isExplosive = false, isFlame = false) {
+                this.x = x; this.y = y; this.w = isFlame ? 14 : 6; this.h = isFlame ? 14 : 6;
+                this.vx = dx * speed; this.vy = dy * speed;
+                this.damage = dmg; this.color = color;
+                this.owner = owner; this.isExplosive = isExplosive; this.isFlame = isFlame;
+                this.dead = false; this.life = isFlame ? 20 : 90;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.life--;
+                if (this.life <= 0 || this.x < cameraX - 100 || this.x > cameraX + 1100) this.dead = true;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                if (this.isFlame) {
+                    ctx.beginPath(); ctx.arc(this.x-cameraX, this.y, 8, 0, Math.PI*2); ctx.fill();
+                } else if (this.isExplosive) {
+                    ctx.beginPath(); ctx.arc(this.x-cameraX, this.y, 6, 0, Math.PI*2); ctx.fill();
+                } else {
+                    ctx.fillRect(this.x-cameraX, this.y, this.w, this.h);
+                }
+            }
+        }
+
+        class Grenade {
+            constructor(x, y, vx, vy, owner) {
+                this.x = x; this.y = y; this.w = 8; this.h = 8;
+                this.vx = vx; this.vy = vy;
+                this.owner = owner;
+                this.timer = 55; this.dead = false;
+            }
+            update() {
+                this.vy += gravity;
+                this.x += this.vx; this.y += this.vy;
+                let lvl = LEVELS[currentLevel];
+                if (this.y + this.h >= lvl.groundY) {
+                    this.y = lvl.groundY - this.h;
+                    this.vy *= -0.4; this.vx *= 0.6;
+                }
+                this.timer--;
+                if (this.timer <= 0) this.explode();
+            }
+            explode() {
+                this.dead = true;
+                sfx.explosion();
+                screenShake = 16;
+                createExplosion(this.x, this.y, 70, this.owner);
+            }
+            draw() {
+                ctx.fillStyle = '#15803d';
+                ctx.beginPath(); ctx.arc(this.x-cameraX, this.y, 6, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#facc15'; ctx.fillRect(this.x-cameraX-2, this.y-7, 4, 3);
+            }
+        }
+
+        function createExplosion(x, y, radius, owner) {
+            spawnParticles(x, y, '#ef4444', 35);
+            spawnParticles(x, y, '#facc15', 25);
+            spawnParticles(x, y, '#94a3b8', 15);
+            let hitBox = { x: x - radius, y: y - radius, w: radius*2, h: radius*2 };
+            
+            if (owner === 'PLAYER') {
+                enemies.forEach(e => { if(rectIntersect(hitBox, e)) e.takeDamage(150); });
+                if (boss && boss.active && rectIntersect(hitBox, boss)) boss.takeDamage(150);
+            } else {
+                if (rectIntersect(hitBox, player)) player.takeDamage(45);
+            }
+        }
+
+        class Enemy {
+            constructor(x, y, type) {
+                this.x = x; this.y = y;
+                this.w = 40; this.h = 58;
+                this.type = type; // 'FRENCH', 'US'
+                this.vx = -1.6;
+                this.hp = 45;
+                this.dead = false;
+                this.shootTimer = Math.random() * 80;
+            }
+            update() {
+                this.x += this.vx;
+                
+                let dist = Math.abs(player.x - this.x);
+                if (dist < 450 && this.x > cameraX && this.x < cameraX + 960) {
+                    if (dist < 220) this.vx = 0;
+                    else this.vx = player.x < this.x ? -1.6 : 1.6;
+
+                    this.shootTimer--;
+                    if (this.shootTimer <= 0) {
+                        let dirX = player.x < this.x ? -1 : 1;
+                        bullets.push(new Bullet(this.x + this.w/2, this.y + 20, dirX, 0, 8.5, 15, '#f87171', 'ENEMY'));
+                        this.shootTimer = 75 + Math.random() * 50;
+                        sfx.shootPistol();
+                    }
+                }
+
+                if (this.x < cameraX - 200 || this.hp <= 0) this.dead = true;
+            }
+            takeDamage(amt) {
+                this.hp -= amt;
+                spawnParticles(this.x+this.w/2, this.y+this.h/2, '#ef4444', 6);
+                if (this.hp <= 0) {
+                    score += 150;
+                    sfx.explosion();
+                    if (Math.random() < 0.25) {
+                        const wKeys = Object.keys(WEAPONS);
+                        const rWep = WEAPONS[wKeys[Math.floor(Math.random()*wKeys.length)]];
+                        items.push(new Item(this.x, LEVELS[currentLevel].groundY - 24, 'WEAPON', rWep, rWep.ammoMax));
+                    }
+                }
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y);
+                let dir = player.x < this.x ? -1 : 1;
+                
+                if (this.type === 'FRENCH' && images.enemyFrench) ctx.drawImage(images.enemyFrench, 0, 0, this.w, this.h);
+                else if (this.type === 'US' && images.enemyUS) ctx.drawImage(images.enemyUS, 0, 0, this.w, this.h);
+                else {
+                    // PROCEDURAL ENEMY SOLDIER
+                    ctx.fillStyle = this.type === 'FRENCH' ? '#475569' : '#3f6212';
+                    ctx.fillRect(6, 16, 28, 26);
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(8, 42, 8, 16); ctx.fillRect(24, 42, 8, 16);
+                    ctx.fillStyle = '#fca5a5'; ctx.fillRect(10, 4, 20, 14); // Face
+                    ctx.fillStyle = this.type === 'FRENCH' ? '#1e293b' : '#14532d'; ctx.fillRect(6, 0, 28, 6); // Helmet
+                    
+                    // Gun
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(dir===-1 ? -12 : 24, 24, 26, 6);
+                }
+                ctx.restore();
+            }
+        }
+
+        class Boss {
+            constructor(x, y, type, name) {
+                this.x = x; this.y = y;
+                this.type = type; this.name = name;
+                this.w = 220; this.h = 140;
+                this.hp = 900 + currentLevel * 400;
+                this.maxHp = this.hp;
+                this.dead = false; this.active = false;
+                this.timer = 0;
+            }
+            update() {
+                if (!this.active) {
+                    if (cameraX + 960 > this.x - 50) this.active = true;
+                    return;
+                }
+                this.timer++;
+                
+                // Attack Patterns
+                if (this.timer % 110 === 0) {
+                    bullets.push(new Bullet(this.x, this.y + 60, -1, 0, 10, 30, '#ef4444', 'ENEMY', true));
+                    sfx.shootB40();
+                }
+                if (this.timer % 65 === 0) {
+                    bullets.push(new Bullet(this.x, this.y + 30, -1, -0.15, 8, 12, '#facc15', 'ENEMY'));
+                    bullets.push(new Bullet(this.x, this.y + 50, -1, 0, 8, 12, '#facc15', 'ENEMY'));
+                    bullets.push(new Bullet(this.x, this.y + 70, -1, 0.15, 8, 12, '#facc15', 'ENEMY'));
+                    sfx.shootAK();
+                }
+            }
+            takeDamage(amt) {
+                if(!this.active) return;
+                this.hp -= amt;
+                spawnParticles(this.x + Math.random()*this.w, this.y + Math.random()*this.h, '#facc15', 8);
+                if (this.hp <= 0) {
+                    this.dead = true;
+                    score += 6000;
+                    for(let i=0; i<12; i++) setTimeout(()=>createExplosion(this.x+Math.random()*this.w, this.y+Math.random()*this.h, 70, 'PLAYER'), i*160);
+                    setTimeout(() => endGame(true), 2600);
+                }
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y);
+                
+                let imgKey = this.type.includes('TANK') ? 'bossTank' : (this.type.includes('HELI') ? 'bossHeli' : (this.type.includes('B52') ? 'bossB52' : 'bossGate'));
+                if (images[imgKey]) ctx.drawImage(images[imgKey], 0, 0, this.w, this.h);
+                else {
+                    // PROCEDURAL BOSS ART
+                    if (this.type.includes('TANK') || this.type.includes('M113')) {
+                        ctx.fillStyle = '#3f6212'; ctx.fillRect(20, 40, 170, 60);
+                        ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 100, 210, 40); // Treads
+                        ctx.fillStyle = '#1e293b'; ctx.fillRect(-50, 50, 90, 16); // Main Cannon
+                        ctx.fillStyle = '#14532d'; ctx.beginPath(); ctx.arc(100, 40, 45, Math.PI, 0); ctx.fill();
+                    } else if (this.type.includes('HELI')) {
+                        ctx.fillStyle = '#1e293b'; ctx.fillRect(20, 30, 180, 60);
+                        ctx.fillStyle = '#64748b'; ctx.fillRect(-20, 10, 240, 10); // Rotor
+                    } else if (this.type.includes('B52')) {
+                        ctx.fillStyle = '#334155'; ctx.fillRect(0, 20, 250, 70); // Crashed Wreckage
+                        ctx.fillStyle = '#ef4444'; ctx.fillRect(40, 40, 30, 30); // Burning engine
+                    } else { // DINH DỌC LẬP GATE
+                        ctx.fillStyle = '#94a3b8'; ctx.fillRect(0, 0, 40, 140); ctx.fillRect(180, 0, 40, 140); // Pillars
+                        ctx.fillStyle = '#1e293b'; ctx.fillRect(40, 20, 140, 120); // Iron Gate
+                        // Red Yellow Flag on top
+                        ctx.fillStyle = '#da251d'; ctx.fillRect(100, -30, 40, 20);
+                        ctx.fillStyle = '#ffff00'; ctx.fillRect(115, -22, 10, 5);
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        class Item {
+            constructor(x, y, type, weaponData=null, ammo=0) {
+                this.x = x; this.y = y; this.w = 34; this.h = 24;
+                this.type = type;
+                this.weaponData = weaponData;
+                this.ammo = ammo;
+                this.dead = false;
+                this.floatTimer = Math.random()*Math.PI*2;
+            }
+            draw() {
+                let drawY = this.y + Math.sin(frameCount * 0.1 + this.floatTimer) * 5;
+                ctx.save();
+                ctx.translate(this.x - cameraX, drawY);
+                if (this.type === 'WEAPON') {
+                    ctx.fillStyle = '#f59e0b'; ctx.fillRect(0, 0, 34, 18);
+                    ctx.fillStyle = '#0f172a'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('GUN', 4, 13);
+                } else if (this.type === 'HP') {
+                    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 22, 22);
+                    ctx.fillStyle = '#ef4444'; ctx.fillRect(9, 4, 4, 14); ctx.fillRect(4, 9, 14, 4);
+                } else if (this.type === 'BOMB') {
+                    ctx.fillStyle = '#15803d'; ctx.fillRect(0, 0, 18, 22);
+                }
+                ctx.fillStyle = '#38bdf8'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('[F]', 6, -6);
+                ctx.restore();
+            }
+        }
+
+        class Hostage {
+            constructor(x, y) {
+                this.x = x; this.y = y; this.w = 36; this.h = 48;
+                this.rescued = false;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y);
+                if (this.rescued) {
+                    // Rescued Guerrilla Saluting!
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(8, 16, 20, 30); // Áo bà ba đen
+                    ctx.fillStyle = '#fca5a5'; ctx.fillRect(10, 2, 16, 14);
+                    // Checkered Scarf (Khăn rằn)
+                    ctx.fillStyle = '#e2e8f0'; ctx.fillRect(8, 14, 20, 4);
+                    // Salute Arm
+                    ctx.fillStyle = '#fca5a5'; ctx.fillRect(20, 2, 10, 4);
+                    ctx.fillStyle = '#facc15'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('CẢM ƠN!', -10, -8);
+                } else {
+                    // Tied Up Captive
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(8, 16, 20, 30);
+                    ctx.fillStyle = '#fca5a5'; ctx.fillRect(10, 4, 16, 14);
+                    ctx.fillStyle = '#e2e8f0'; ctx.fillRect(4, 22, 28, 5); // Rope
+                    ctx.fillStyle = '#38bdf8'; ctx.font = '8px "Press Start 2P"'; ctx.fillText('CỨU[F]', -6, -8);
+                }
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, speed) {
+                this.x = x; this.y = y;
+                this.vx = (Math.random() - 0.5) * speed * 2;
+                this.vy = (Math.random() - 0.5) * speed * 2;
+                this.color = color;
+                this.life = 1.0;
+                this.dead = false;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.life -= 0.04;
+                if (this.life <= 0) this.dead = true;
+            }
+            draw() {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - cameraX, this.y, 4, 4);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        function spawnParticles(x, y, color, count) {
+            for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, 5.5));
+        }
+
+        /**
+         * ============================================================================
+         * 6. GAME CONTROL LOOPS & LEVEL MANAGEMENT
+         * ============================================================================
+         */
+        function startLevel(index) {
+            currentLevel = index;
+            let lvl = LEVELS[currentLevel];
+            
+            player = new Player(100, lvl.groundY - 58);
+            bullets = []; grenades = []; enemies = []; items = []; hostages = []; particles = []; platforms = []; traps = [];
+            cameraX = 0; score = 0;
+            
+            // Build Level Terrain & Entities
+            for(let i = 500; i < lvl.length - 750; i += 280 + Math.random()*220) {
+                let eType = currentLevel < 2 ? 'FRENCH' : 'US';
+                enemies.push(new Enemy(i, lvl.groundY - 58, eType));
+                
+                if (Math.random() < 0.45) {
+                    platforms.push({ x: i - 40, y: lvl.groundY - 85, w: 110, h: 12 });
+                    if(Math.random()<0.5) enemies.push(new Enemy(i-10, lvl.groundY - 143, eType));
+                }
+
+                if (currentLevel === 2 && Math.random() < 0.3) {
+                    traps.push({ x: i + 100, y: lvl.groundY - 15, w: 40, h: 15 }); // Spike trap
+                }
+
+                if (Math.random() < 0.25) hostages.push(new Hostage(i + 140, lvl.groundY - 48));
+            }
+
+            boss = new Boss(lvl.length - 260, lvl.groundY - 140, lvl.boss, lvl.bossName);
+            
+            gameState = 'PLAYING';
+            hideAllMenus();
+        }
+
+        function endGame(isVictory) {
+            gameState = isVictory ? 'VICTORY' : 'GAMEOVER';
+            
+            if (isVictory) sfx.victory();
+            
+            document.getElementById('gameOverMenu').classList.remove('hidden');
+            document.getElementById('gameOverTitle').innerText = isVictory ? "CHIẾN THẮNG HOÀN TOÀN!" : "HY SINH";
+            document.getElementById('gameOverTitle').className = isVictory ? "text-2xl sm:text-4xl text-yellow-400 font-bold mb-2 text-glow-gold" : "text-2xl sm:text-4xl text-red-600 font-bold mb-2 text-glow-red";
+            document.getElementById('gameOverSub').innerText = LEVELS[currentLevel].name;
+            document.getElementById('finalScore').innerText = `ĐIỂM CHIẾN CÔNG: ${score}`;
+            
+            if (isVictory && currentLevel < LEVELS.length - 1) {
+                document.getElementById('btnNextLevel').classList.remove('hidden');
+            } else {
+                document.getElementById('btnNextLevel').classList.add('hidden');
+            }
+        }
+
+        function drawBackground() {
+            let lvl = LEVELS[currentLevel];
+            let bgKey = lvl.theme;
+            
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (images[bgKey]) {
+                ctx.drawImage(images[bgKey], 0, 0, canvas.width, canvas.height);
+            } else {
+                // PROCEDURAL BACKGROUND RENDERING
+                if (currentLevel === 0) { // Việt Bắc
+                    ctx.fillStyle = '#14532d'; ctx.fillRect(0, 180, canvas.width, canvas.height);
+                    ctx.fillStyle = '#22c55e';
+                    for(let i=0; i<25; i++) ctx.fillRect((i*90 - cameraX*0.25)%960, 200, 12, 240); // Bamboo Forest
+                } else if (currentLevel === 1) { // Điện Biên Phủ
+                    ctx.fillStyle = '#78350f'; ctx.fillRect(0, 220, canvas.width, canvas.height);
+                    ctx.fillStyle = '#451a03';
+                    for(let i=0; i<8; i++) { ctx.beginPath(); ctx.arc((i*180 - cameraX*0.35)%960, 440, 90, Math.PI, 0); ctx.fill(); } // Trenches
+                } else if (currentLevel === 4) { // Hà Nội Night
+                    ctx.fillStyle = '#020617'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 3;
+                    let beamX = (frameCount*2)%960;
+                    ctx.beginPath(); ctx.moveTo(beamX, 440); ctx.lineTo(beamX - 100, 0); ctx.stroke(); // Searchlights
+                } else if (currentLevel === 5) { // Sài Gòn
+                    ctx.fillStyle = '#1e1b4b'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#312e81'; ctx.fillRect(0, 220, canvas.width, 220); // City Skyline
+                } else {
+                    ctx.fillStyle = '#064e3b'; ctx.fillRect(0, 180, canvas.width, canvas.height);
+                }
+            }
+
+            // Ground Level
+            ctx.fillStyle = '#3f271d'; ctx.fillRect(0, lvl.groundY, canvas.width, canvas.height - lvl.groundY);
+            ctx.fillStyle = '#166534'; ctx.fillRect(0, lvl.groundY, canvas.width, 14);
+
+            // Platforms
+            ctx.fillStyle = '#78350f';
+            platforms.forEach(p => {
+                ctx.fillRect(p.x - cameraX, p.y, p.w, p.h);
+                ctx.fillStyle = '#a3e635'; ctx.fillRect(p.x - cameraX, p.y, p.w, 3.5);
+            });
+
+            // Spike Traps
+            ctx.fillStyle = '#94a3b8';
+            traps.forEach(t => {
+                for(let sx=0; sx<t.w; sx+=10) {
+                    ctx.beginPath(); ctx.moveTo(t.x + sx - cameraX, t.y + t.h); ctx.lineTo(t.x + sx + 5 - cameraX, t.y); ctx.lineTo(t.x + sx + 10 - cameraX, t.y + t.h); ctx.fill();
+                }
+            });
+        }
+
+        function drawHUD() {
+            ctx.save();
+            // Player HP Bar
+            ctx.fillStyle = '#1e293b'; ctx.fillRect(20, 20, 220, 22);
+            ctx.fillStyle = '#ef4444'; ctx.fillRect(20, 20, (player.hp/player.maxHp)*220, 22);
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 220, 22);
+            
+            ctx.fillStyle = '#ffffff'; ctx.font = '10px "Press Start 2P"';
+            ctx.fillText(`HP`, 26, 35);
+            ctx.fillText(`MẠNG: ${player.lives}`, 260, 35);
+            ctx.fillText(`ĐIỂM: ${score}`, 750, 35);
+
+            // Inventory Status Panel
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(20, 52, 360, 42);
+            ctx.strokeStyle = '#475569'; ctx.strokeRect(20, 52, 360, 42);
+            
+            ctx.fillStyle = player.slot===1 ? '#facc15' : '#94a3b8'; ctx.fillText('[1]DAO', 30, 78);
+            ctx.fillStyle = player.slot===2 ? '#facc15' : '#94a3b8'; ctx.fillText('[2]K-54', 115, 78);
+            
+            ctx.fillStyle = player.slot===3 ? '#facc15' : '#94a3b8';
+            let heavyText = player.heavyWeapon ? `[3]${player.heavyWeapon.name}:${player.heavyAmmo}` : '[3]TRỐNG';
+            ctx.fillText(heavyText, 205, 78);
+
+            // Grenade Counter
+            ctx.fillStyle = '#22c55e'; ctx.fillText(`BOM[L]: ${player.bombs}`, 400, 78);
+
+            // Boss Health Bar
+            if (boss && boss.active && !boss.dead) {
+                ctx.fillStyle = '#facc15'; ctx.fillText(`TRÙM: ${boss.name}`, 200, 485);
+                ctx.fillStyle = '#1e293b'; ctx.fillRect(200, 495, 560, 22);
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(200, 495, Math.max(0, boss.hp/boss.maxHp)*560, 22);
+                ctx.strokeStyle = '#ffffff'; ctx.strokeRect(200, 495, 560, 22);
+            }
+
+            // Special Victory Ending Animation for Level 6 (Saigon Victory Flag Raising)
+            if (gameState === 'VICTORY' && currentLevel === 5) {
+                ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#facc15'; ctx.font = '16px "Press Start 2P"';
+                ctx.fillText("CẮM CỜ GIẢI PHÓNG TẠI DINH ĐỘC LẬP!", 180, 200);
+                
+                // Flag Rendering (Half Red, Half Blue, Yellow Star)
+                let flagX = 460, flagY = 240;
+                ctx.fillStyle = '#da251d'; ctx.fillRect(flagX, flagY, 80, 25); // Top Red
+                ctx.fillStyle = '#0056b3'; ctx.fillRect(flagX, flagY + 25, 80, 25); // Bottom Blue
+                ctx.fillStyle = '#ffff00'; ctx.beginPath(); ctx.arc(flagX + 40, flagY + 25, 12, 0, Math.PI*2); ctx.fill(); // Star Center
+            }
+
+            ctx.restore();
+            
+            // Sync Mobile Slot Highlights
+            ['tBtn1','tBtn2','tBtn3'].forEach(id => document.getElementById(id).classList.remove('slot-active'));
+            if(player) document.getElementById(`tBtn${player.slot}`).classList.add('slot-active');
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+            frameCount++;
+
+            // Screen Shake Effect
+            if (screenShake > 0) {
+                ctx.save();
+                ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+                screenShake *= 0.85;
+                if (screenShake < 0.5) screenShake = 0;
+            }
+
+            // Bullet Updates & Hit Detection
+            bullets.forEach(b => {
+                b.update();
+                if (b.owner === 'PLAYER') {
+                    enemies.forEach(e => {
+                        if (!b.dead && !e.dead && rectIntersect(b, e)) {
+                            e.takeDamage(b.damage);
+                            if(!b.isExplosive && !b.isFlame) b.dead = true;
+                            if(b.isExplosive) createExplosion(b.x, b.y, 45, 'PLAYER');
+                        }
+                    });
+                    if (boss && boss.active && !b.dead && rectIntersect(b, boss)) {
+                        boss.takeDamage(b.damage);
+                        if(!b.isExplosive && !b.isFlame) b.dead = true;
+                        if(b.isExplosive) createExplosion(b.x, b.y, 45, 'PLAYER');
+                    }
+                } else {
+                    if (!b.dead && rectIntersect(b, player)) {
+                        player.takeDamage(b.damage);
+                        if(!b.isExplosive) b.dead = true;
+                        if(b.isExplosive) createExplosion(b.x, b.y, 45, 'ENEMY');
+                    }
+                }
+            });
+
+            grenades.forEach(g => g.update());
+            enemies.forEach(e => e.update());
+            particles.forEach(p => p.update());
+            if (boss) boss.update();
+            player.update();
+
+            // Smooth Camera Follow
+            let targetCamX = player.x - 300;
+            if (targetCamX < 0) targetCamX = 0;
+            if (targetCamX > LEVELS[currentLevel].length - 960) targetCamX = LEVELS[currentLevel].length - 960;
+            cameraX += (targetCamX - cameraX) * 0.1;
+
+            // Entity Cleanup
+            bullets = bullets.filter(b => !b.dead);
+            grenades = grenades.filter(g => !g.dead);
+            enemies = enemies.filter(e => !e.dead);
+            items = items.filter(i => !i.dead);
+            particles = particles.filter(p => !p.dead);
+            
+            prevKeys = { ...keys };
+        }
+
+        function draw() {
+            if (gameState === 'MENU' || gameState === 'LEVEL_SELECT') return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+            
+            items.forEach(i => i.draw());
+            hostages.forEach(h => h.draw());
+            enemies.forEach(e => e.draw());
+            if (boss && !boss.dead) boss.draw();
+            player.draw();
+            bullets.forEach(b => b.draw());
+            grenades.forEach(g => g.draw());
+            particles.forEach(p => p.draw());
+            
+            drawHUD();
+
+            if (screenShake > 0) ctx.restore();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        /**
+         * ============================================================================
+         * 7. USER INPUT & UI EVENT LISTENERS
+         * ============================================================================
+         */
+        window.addEventListener('keydown', (e) => {
+            let k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) keys[k] = true;
+            sfx.init();
+        });
+        window.addEventListener('keyup', (e) => {
+            let k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) keys[k] = false;
+        });
+
+        // Mobile Controls Helper
+        function bindTouchBtn(id, keyStr) {
+            const btn = document.getElementById(id);
+            if(!btn) return;
+            btn.addEventListener('touchstart', (e)=>{ e.preventDefault(); keys[keyStr] = true; sfx.init(); });
+            btn.addEventListener('touchend', (e)=>{ e.preventDefault(); keys[keyStr] = false; });
+            btn.addEventListener('mousedown', (e)=>{ keys[keyStr] = true; sfx.init(); });
+            btn.addEventListener('mouseup', (e)=>{ keys[keyStr] = false; });
+            btn.addEventListener('mouseleave', (e)=>{ keys[keyStr] = false; });
+        }
+        bindTouchBtn('tBtnW','w'); bindTouchBtn('tBtnA','a'); bindTouchBtn('tBtnS','s'); bindTouchBtn('tBtnD','d');
+        bindTouchBtn('tBtnJ','j'); bindTouchBtn('tBtnK','k'); bindTouchBtn('tBtnL','l');
+        bindTouchBtn('tBtnF','f'); bindTouchBtn('tBtnG','g');
+        bindTouchBtn('tBtn1','1'); bindTouchBtn('tBtn2','2'); bindTouchBtn('tBtn3','3');
+
+        // UI Overlay Controls
+        function hideAllMenus() {
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('levelSelectMenu').classList.add('hidden');
+            document.getElementById('gameOverMenu').classList.add('hidden');
+        }
+
+        document.getElementById('btnStart').addEventListener('click', () => { sfx.init(); startLevel(0); });
+        
+        document.getElementById('btnLevelSelect').addEventListener('click', () => {
+            sfx.init();
+            hideAllMenus();
+            document.getElementById('levelSelectMenu').classList.remove('hidden');
+            const list = document.getElementById('levelList');
+            list.innerHTML = '';
+            LEVELS.forEach((lvl, i) => {
+                let div = document.createElement('div');
+                div.className = "p-3.5 bg-slate-900 border border-slate-700 rounded-lg hover:bg-slate-800 hover:border-yellow-400 cursor-pointer text-left transition shadow";
+                div.innerHTML = `<h3 class="text-yellow-400 font-bold text-xs sm:text-sm mb-1">${lvl.name}</h3><p class="text-[10px] sm:text-xs text-gray-300">${lvl.desc}</p>`;
+                div.onclick = () => startLevel(i);
+                list.appendChild(div);
+            });
+        });
+
+        document.getElementById('btnBackMenu').addEventListener('click', () => {
+            hideAllMenus();
+            document.getElementById('mainMenu').classList.remove('hidden');
+        });
+
+        document.getElementById('btnMenuFromEnd').addEventListener('click', () => {
+            hideAllMenus();
+            document.getElementById('mainMenu').classList.remove('hidden');
+        });
+
+        document.getElementById('btnRestart').addEventListener('click', () => { sfx.init(); startLevel(currentLevel); });
+        document.getElementById('btnNextLevel').addEventListener('click', () => { sfx.init(); startLevel(currentLevel + 1); });
+
+        // Start Game Loop
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
+```
